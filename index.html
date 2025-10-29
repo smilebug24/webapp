@@ -1,11 +1,468 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=fi, initial-scale=1.0">
-    <title>jin'page</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>가상 채팅 앱 — Single File</title>
+<style>
+  :root{
+    --bg:#0f1724;
+    --card:#0b1220;
+    --accent:#5eead4;
+    --user:#60a5fa;
+    --bot:#94a3b8;
+    --muted:#94a3b8;
+    --glass: rgba(255,255,255,0.03);
+    --shadow: 0 6px 18px rgba(2,6,23,0.6);
+    font-family: Inter, "Segoe UI", Roboto, "Noto Sans KR", system-ui, -apple-system, "Helvetica Neue", Arial;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 600px at 10% 10%, rgba(94,234,212,0.05), transparent 8%),
+      radial-gradient(900px 400px at 90% 90%, rgba(96,165,250,0.03), transparent 8%),
+      linear-gradient(180deg, #071126 0%, #02101a 100%);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    color:#e6eef6;
+  }
+
+  /* App card */
+  .app {
+    width:100%;
+    max-width:960px;
+    height:80vh;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius:14px;
+    box-shadow:var(--shadow);
+    display:grid;
+    grid-template-columns:300px 1fr;
+    overflow:hidden;
+  }
+
+  /* Sidebar (users/settings) */
+  .sidebar {
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));
+    border-right:1px solid rgba(255,255,255,0.03);
+    padding:18px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .logo {
+    display:flex;
+    gap:10px;
+    align-items:center;
+    font-weight:600;
+    letter-spacing:0.4px;
+  }
+  .logo .dot{
+    width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--user));
+    display:inline-flex;align-items:center;justify-content:center;color:#032; font-weight:700;
+  }
+
+  .profile {
+    display:flex;gap:10px;align-items:center;margin-top:8px;
+  }
+  .avatar{
+    width:52px;height:52px;border-radius:10px;background:linear-gradient(180deg,var(--user),#2563eb);
+    display:flex;align-items:center;justify-content:center;font-weight:700;color:white;
+  }
+  label{
+    display:block;font-size:13px;color:var(--muted);
+  }
+  input[type="text"], select {
+    width:100%;
+    padding:8px 10px;
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,0.04);
+    background:var(--glass);
+    color:inherit;
+    outline:none;
+    font-size:14px;
+  }
+  .controls {display:flex;gap:8px;margin-top:8px;}
+  button {
+    border:0;padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600;
+    background:linear-gradient(90deg,var(--accent), #34d399);
+    color:#012;box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+  }
+  button.ghost{
+    background:transparent;color:var(--muted);border:1px solid rgba(255,255,255,0.04);
+    box-shadow:none;font-weight:600;
+  }
+  .chats-list{margin-top:8px;flex:1;overflow:auto;padding-right:6px}
+  .chat-item{
+    padding:10px;border-radius:8px;margin-bottom:8px;display:flex;align-items:center;gap:10px;
+    cursor:pointer;border:1px solid transparent;
+  }
+  .chat-item:hover{background:rgba(255,255,255,0.02);border-color:rgba(255,255,255,0.02)}
+  .chat-item .mini{
+    width:44px;height:44px;border-radius:8px;background:linear-gradient(180deg,var(--bot),#64748b);display:flex;align-items:center;justify-content:center;font-weight:700;
+  }
+  .meta{font-size:13px;color:var(--muted)}
+
+  /* Chat area */
+  .chat-area {
+    display:flex;flex-direction:column;
+    background:linear-gradient(180deg, rgba(0,0,0,0.04), transparent);
+  }
+  .chat-header{
+    padding:18px;border-bottom:1px solid rgba(255,255,255,0.02);display:flex;align-items:center;justify-content:space-between;
+  }
+  .chat-window{
+    padding:18px;flex:1;overflow:auto;display:flex;flex-direction:column;gap:12px;background:
+      linear-gradient(180deg, rgba(255,255,255,0.0), rgba(255,255,255,0.0));
+  }
+  .message{
+    max-width:72%;
+    padding:10px 12px;border-radius:12px;display:inline-block;line-height:1.3;
+    box-shadow:0 6px 16px rgba(2,6,23,0.45);
+    position:relative;
+    word-break:break-word;
+    transform-origin:bottom right;
+  }
+  .msg-user{
+    margin-left:auto;background:linear-gradient(180deg,var(--user), #2563eb);border-bottom-right-radius:2px;
+  }
+  .msg-bot{
+    margin-right:auto;background:linear-gradient(180deg,var(--bot), #525f6f);border-bottom-left-radius:2px;
+  }
+  .ts{display:block;font-size:11px;color:rgba(255,255,255,0.7);margin-top:6px;opacity:0.9}
+  .typing {
+    display:inline-block;padding:6px 10px;border-radius:10px;background:rgba(255,255,255,0.03);
+    font-style:italic;color:var(--muted);max-width:60%;
+  }
+
+  /* composer */
+  .composer{
+    padding:12px 18px;border-top:1px solid rgba(255,255,255,0.02);display:flex;gap:10px;align-items:center;
+  }
+  .composer textarea{
+    flex:1;resize:none;height:46px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);
+    background:transparent;color:inherit;font-size:14px;outline:none;
+  }
+  .send-btn{
+    min-width:84px;padding:10px 14px;border-radius:10px;border:0;background:linear-gradient(90deg,var(--user),#06b6d4);
+    color:#012;font-weight:700;cursor:pointer;
+  }
+
+  /* small screens */
+  @media (max-width:820px){
+    .app{grid-template-columns:1fr; height:92vh;}
+    .sidebar{order:2;height:220px;overflow:auto}
+    .chat-area{order:1}
+  }
+</style>
 </head>
 <body>
-    나의 첫 웹페이지
+  <div class="app" role="application" aria-label="가상의 채팅 앱">
+    <!-- Sidebar -->
+    <aside class="sidebar" aria-label="설정 및 대화 목록">
+      <div class="logo" aria-hidden="true">
+        <div class="dot">C</div>
+        <div>
+          <div>ChatSim</div>
+          <div style="font-size:12px;color:var(--muted)">single-file demo</div>
+        </div>
+      </div>
+
+      <div class="profile" aria-hidden="false">
+        <div class="avatar" id="avatarInitial">J</div>
+        <div style="flex:1">
+          <label for="username">닉네임</label>
+          <input id="username" type="text" value="jin" aria-label="닉네임 입력" />
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button id="saveProfile">저장</button>
+            <button id="clearChats" class="ghost">대화 삭제</button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label>시나리오</label>
+        <select id="scenario">
+          <option value="friendly">친절한 봇</option>
+          <option value="echo">에코(반복)</option>
+          <option value="sarcasm">비꼬는 봇</option>
+        </select>
+      </div>
+
+      <div style="margin-top:8px">
+        <label>대화 목록</label>
+        <div class="chats-list" id="chatsList" aria-live="polite"></div>
+      </div>
+
+    </aside>
+
+    <!-- Chat area -->
+    <main class="chat-area" aria-live="polite">
+      <div class="chat-header">
+        <div>
+          <div style="font-weight:700" id="chatTitle">새 대화</div>
+          <div class="meta" id="chatMeta">가상의 채팅 — 로컬 저장</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="newChat" class="ghost">새 대화</button>
+        </div>
+      </div>
+
+      <div class="chat-window" id="chatWindow" role="log" aria-atomic="false"></div>
+
+      <div class="composer" aria-label="메시지 입력">
+        <textarea id="msgInput" placeholder="메시지 입력 — Enter: 전송, Shift+Enter: 줄바꿈" aria-label="메시지"></textarea>
+        <button id="sendBtn" class="send-btn" aria-label="전송">전송</button>
+      </div>
+    </main>
+  </div>
+
+<script>
+/*
+  Single-file virtual chat app
+  - localStorage 기반 대화 저장
+  - 간단한 봇 응답 시나리오
+  - 타이핑 인디케이터, 시간표시, 접근성 개선
+*/
+
+(() => {
+  // DOM
+  const usernameEl = document.getElementById('username');
+  const avatarInitialEl = document.getElementById('avatarInitial');
+  const saveProfileBtn = document.getElementById('saveProfile');
+  const clearChatsBtn = document.getElementById('clearChats');
+  const scenarioEl = document.getElementById('scenario');
+  const chatsListEl = document.getElementById('chatsList');
+  const chatWindow = document.getElementById('chatWindow');
+  const msgInput = document.getElementById('msgInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const newChatBtn = document.getElementById('newChat');
+  const chatTitleEl = document.getElementById('chatTitle');
+
+  // Storage keys
+  const STORE_KEY = 'chats_v1';
+  const PROFILE_KEY = 'chat_profile_v1';
+
+  // App state
+  let state = {
+    profile: { name: 'jin' },
+    chats: [], // {id, title, messages: [{sender, text, ts}]}
+    activeChatId: null,
+  };
+
+  // UTIL
+  function uid(prefix='id') {
+    return prefix + '_' + Math.random().toString(36).slice(2,9);
+  }
+  function timeNow(){
+    const d = new Date();
+    return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  }
+
+  // Storage functions
+  function loadState(){
+    try {
+      const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+      const p = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null');
+      if (s && Array.isArray(s.chats)) state.chats = s.chats;
+      if (p && p.name) state.profile = p;
+    } catch(e){ console.warn('load state failed',e) }
+  }
+  function saveState(){
+    localStorage.setItem(STORE_KEY, JSON.stringify({ chats: state.chats }));
+  }
+  function saveProfile(){
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(state.profile));
+  }
+
+  // UI rendering
+  function renderChatsList(){
+    chatsListEl.innerHTML = '';
+    if(state.chats.length===0){
+      const n = document.createElement('div');
+      n.style.color='var(--muted)';
+      n.style.fontSize='13px';
+      n.textContent = '대화가 없습니다. 새 대화를 시작하세요.';
+      chatsListEl.appendChild(n);
+      return;
+    }
+    state.chats.slice().reverse().forEach(chat=>{
+      const item = document.createElement('div');
+      item.className='chat-item';
+      item.tabIndex = 0;
+      item.onclick = ()=> activateChat(chat.id);
+      item.onkeypress = (e)=>{ if(e.key==='Enter') activateChat(chat.id) };
+      const mini = document.createElement('div'); mini.className='mini';
+      mini.textContent = (chat.title||'C').slice(0,2).toUpperCase();
+      const info = document.createElement('div');
+      const t = document.createElement('div'); t.style.fontWeight='700'; t.textContent = chat.title || '대화';
+      const m = document.createElement('div'); m.className='meta';
+      const last = chat.messages[chat.messages.length-1];
+      m.textContent = last ? `${last.sender}: ${last.text.slice(0,30)} · ${last.ts}` : '비어있음';
+      info.appendChild(t); info.appendChild(m);
+      item.appendChild(mini); item.appendChild(info);
+      chatsListEl.appendChild(item);
+    });
+  }
+
+  function renderActiveChat(){
+    chatWindow.innerHTML = '';
+    const chat = state.chats.find(c=>c.id===state.activeChatId);
+    if(!chat){ chatTitleEl.textContent='새 대화'; return; }
+    chatTitleEl.textContent = chat.title || '대화';
+    chat.messages.forEach(m=>{
+      const box = document.createElement('div');
+      box.className = 'message ' + (m.sender==='user' ? 'msg-user' : 'msg-bot');
+      box.innerHTML = `<div>${escapeHtml(m.text)}</div><span class="ts">${m.sender==='user' ? state.profile.name : 'Bot'} · ${m.ts}</span>`;
+      chatWindow.appendChild(box);
+    });
+    // scroll to bottom
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+  }
+
+  // Helpers
+  function escapeHtml(s){
+    return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+  }
+
+  // Chat operations
+  function createNewChat(title){
+    const id = uid('chat');
+    const chat = { id, title: title || `대화 ${state.chats.length+1}`, messages: [] };
+    state.chats.push(chat);
+    state.activeChatId = id;
+    saveState();
+    renderChatsList();
+    renderActiveChat();
+  }
+  function activateChat(id){
+    state.activeChatId = id;
+    renderChatsList();
+    renderActiveChat();
+  }
+  function clearAllChats(){
+    if(!confirm('모든 대화를 삭제하시겠습니까?')) return;
+    state.chats = [];
+    state.activeChatId = null;
+    saveState();
+    renderChatsList();
+    renderActiveChat();
+  }
+  function addMessageToActive(sender, text){
+    const chat = state.chats.find(c=>c.id===state.activeChatId);
+    if(!chat) return;
+    const msg = { sender, text, ts: timeNow() };
+    chat.messages.push(msg);
+    saveState();
+    renderActiveChat();
+  }
+
+  // bot responses (simple)
+  function botRespond(userText){
+    const scenario = scenarioEl.value;
+    if(!state.activeChatId) return;
+    const chat = state.chats.find(c=>c.id===state.activeChatId);
+    // show typing indicator
+    const typingEl = document.createElement('div');
+    typingEl.className = 'typing';
+    typingEl.textContent = '상대가 입력 중...';
+    chatWindow.appendChild(typingEl);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+
+    // simulate variable delay
+    const delay = Math.min(1600 + userText.length * 40, 3000);
+    setTimeout(()=>{
+      // remove typing
+      typingEl.remove();
+
+      // produce reply
+      let reply = '';
+      if(scenario==='friendly'){
+        reply = `안녕 ${state.profile.name}님! '${userText}'에 대해 말해줘서 고마워요. 어떻게 도와드릴까요?`;
+      } else if(scenario==='echo'){
+        reply = `👉 ${userText} (제가 그대로 따라했음)`;
+      } else if(scenario==='sarcasm'){
+        reply = `오, 정말 대단하네요... '${userText}'라니요. (농담이에요)`;
+      } else {
+        reply = `응답: ${userText}`;
+      }
+      addMessageToActive('bot', reply);
+    }, delay);
+  }
+
+  // send handler
+  function sendMessage(){
+    const text = msgInput.value.trim();
+    if(text==='') return;
+    if(!state.activeChatId){
+      // if no active chat, create one
+      createNewChat();
+    }
+    addMessageToActive('user', text);
+    msgInput.value = '';
+    msgInput.focus();
+    // auto bot reply
+    botRespond(text);
+  }
+
+  // Events
+  sendBtn.addEventListener('click', sendMessage);
+  msgInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' && !e.shiftKey){
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  saveProfileBtn.addEventListener('click', ()=>{
+    const name = (usernameEl.value || 'jin').trim();
+    state.profile.name = name;
+    avatarInitialEl.textContent = name.charAt(0).toUpperCase();
+    saveProfile();
+    // reflect
+    renderChatsList();
+  });
+
+  clearChatsBtn.addEventListener('click', clearAllChats);
+  newChatBtn.addEventListener('click', ()=> createNewChat());
+
+  // initialize
+  function init(){
+    loadState();
+    // if no chats, create starter chat
+    if(state.chats.length===0){
+      const id = uid('chat');
+      state.chats.push({ id, title:'환영합니다', messages:[
+        {sender:'bot', text:'여기에 메시지를 입력해 보세요. Enter로 전송합니다. 대화는 브라우저 로컬에 저장됩니다.', ts: timeNow()}
+      ]});
+      state.activeChatId = id;
+      saveState();
+    } else {
+      // set last chat as active
+      state.activeChatId = state.chats[state.chats.length-1].id;
+    }
+    // profile
+    usernameEl.value = state.profile.name || 'jin';
+    avatarInitialEl.textContent = (state.profile.name||'J').charAt(0).toUpperCase();
+
+    renderChatsList();
+    renderActiveChat();
+
+    // Accessibility: focus input on load
+    msgInput.focus();
+  }
+
+  // expose for debugging (optional)
+  window.__chatsim = {
+    getState: ()=>state,
+    saveState,
+  };
+
+  init();
+})();
+</script>
 </body>
 </html>
